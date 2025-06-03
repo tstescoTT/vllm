@@ -32,12 +32,15 @@ from datasets import load_dataset
 from PIL import Image
 from transformers import PreTrainedTokenizerBase
 
-from vllm.lora.request import LoRARequest
-from vllm.lora.utils import get_adapter_absolute_path
-from vllm.multimodal import MultiModalDataDict
-from vllm.transformers_utils.tokenizer import AnyTokenizer, get_lora_tokenizer
-
 logger = logging.getLogger(__name__)
+
+try:
+    from vllm.lora.request import LoRARequest
+    from vllm.lora.utils import get_adapter_absolute_path
+    from vllm.multimodal import MultiModalDataDict
+    from vllm.transformers_utils.tokenizer import AnyTokenizer, get_lora_tokenizer
+except ImportError:
+    logger.warning("vLLM dependencies not found. LoRA and multimodal features will be disabled.")
 
 # -----------------------------------------------------------------------------
 # Data Classes
@@ -53,8 +56,8 @@ class SampleRequest:
     prompt: Union[str, Any]
     prompt_len: int
     expected_output_len: int
-    multi_modal_data: Optional[Union[MultiModalDataDict, dict]] = None
-    lora_request: Optional[LoRARequest] = None
+    multi_modal_data: Optional[Union[Any, dict]] = None
+    lora_request: Optional[Any] = None
 
 
 # -----------------------------------------------------------------------------
@@ -88,7 +91,7 @@ class BenchmarkDataset(ABC):
     def apply_multimodal_chat_transformation(
             self,
             prompt: str,
-            mm_content: Optional[MultiModalDataDict] = None) -> list[dict]:
+            mm_content: Optional[Any] = None) -> list[dict]:
         """
         Transform a prompt and optional multimodal content into a chat format.
         This method is used for chat models that expect a specific conversation
@@ -118,7 +121,7 @@ class BenchmarkDataset(ABC):
         tokenizer: PreTrainedTokenizerBase,
         max_loras: Optional[int] = None,
         lora_path: Optional[str] = None,
-    ) -> tuple[Optional[LoRARequest], AnyTokenizer]:
+    ) -> tuple[Optional[Any], Any]:
         """
         Optionally select a random LoRA request and return its associated
         tokenizer.
@@ -233,7 +236,7 @@ def lora_path_on_disk(lora_path: str) -> str:
 
 
 # Global cache for LoRA tokenizers.
-lora_tokenizer_cache: dict[int, AnyTokenizer] = {}
+lora_tokenizer_cache: dict[int, Any] = {}
 
 
 def process_image(image: Any) -> Mapping[str, Any]:
