@@ -245,6 +245,7 @@ async def async_request_deepspeed_mii(
 async def async_request_openai_completions(
     request_func_input: RequestFuncInput,
     pbar: Optional[tqdm] = None,
+    auth_headers: Optional[dict] = None,
 ) -> RequestFuncOutput:
     api_url = request_func_input.api_url
     assert api_url.endswith(
@@ -269,9 +270,14 @@ async def async_request_openai_completions(
             payload["ignore_eos"] = request_func_input.ignore_eos
         if request_func_input.extra_body:
             payload.update(request_func_input.extra_body)
-        headers = {
-            "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}"
-        }
+        
+        # Use auth_headers if provided, otherwise fall back to OPENAI_API_KEY
+        if auth_headers:
+            headers = auth_headers.copy()
+        else:
+            headers = {
+                "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}"
+            }
 
         output = RequestFuncOutput()
         output.prompt_len = request_func_input.prompt_len
@@ -374,6 +380,7 @@ async def async_request_openai_chat_completions(
             payload["ignore_eos"] = request_func_input.ignore_eos
         if request_func_input.extra_body:
             payload.update(request_func_input.extra_body)
+        
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}",

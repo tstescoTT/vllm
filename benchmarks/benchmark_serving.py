@@ -19,6 +19,20 @@ On the client side, run:
     when using tgi backend, add
         --endpoint /generate_stream
     to the end of the command above.
+
+New dataset option "cleaned-random":
+    Uses server-side tokenization to generate stable, cleaned random prompts.
+    Requires OPENAI_API_KEY environment variable and a running vLLM server.
+
+    Example:
+    export OPENAI_API_KEY="test-key"
+    python benchmarks/benchmark_serving.py \
+        --backend vllm \
+        --model meta-llama/Llama-3.1-8B-Instruct \
+        --dataset-name cleaned-random \
+        --num-prompts 100 \
+        --random-input-len 1024 \
+        --random-output-len 128
 """
 import argparse
 import asyncio
@@ -55,7 +69,8 @@ from benchmark_dataset import (AIMODataset, BurstGPTDataset,
                                InstructCoderDataset, RandomDataset,
                                SampleRequest, ShareGPTDataset, SonnetDataset,
                                VisionArenaDataset)
-from benchmark_utils import convert_to_pytorch_benchmark_format, write_to_json
+from benchmark_utils import (convert_to_pytorch_benchmark_format, write_to_json,
+                             SimplePromptClient, generate_cleaned_random_prompts)
 
 MILLISECONDS_TO_SECONDS_CONVERSION = 1000
 
@@ -569,7 +584,45 @@ def main(args: argparse.Namespace):
             "Please specify '--dataset-name' and the corresponding "
             "'--dataset-path' if required.")
 
-    if args.dataset_name == "sonnet":
+    if args.dataset_name == "cleaned-random":
+        # Set up server client for server-side tokenization
+        auth_token = os.environ.get("OPENAI_API_KEY")
+        if not auth_token:
+            raise ValueError("OPENAI_API_KEY environment variable must be set for cleaned-random dataset")
+
+        server_client = SimplePromptClient(
+            host=args.host,
+            port=args.port,
+            auth_token=auth_token
+        )
+
+        # Wait for server to be healthy
+        print("Checking server health for cleaned-random dataset...")
+        if not server_client.wait_for_healthy(timeout=30):
+            raise RuntimeError("Server is not healthy - cannot use cleaned-random dataset")
+
+        # Generate cleaned random prompts using server-side tokenization
+        prompt_tuples = generate_cleaned_random_prompts(
+            num_prompts=args.num_prompts,
+            input_len=args.random_input_len,
+            output_len=args.random_output_len,
+            model_name=model_id,
+            client=server_client,
+            seed=args.seed
+        )
+
+        # Convert to SampleRequest objects
+        input_requests = []
+        for prompt_text, prompt_len, output_len, multi_modal_data in prompt_tuples:
+            request = SampleRequest(
+                prompt=prompt_text,
+                prompt_len=prompt_len,
+                expected_output_len=output_len,
+                multi_modal_data=multi_modal_data
+            )
+            input_requests.append(request)
+
+    elif args.dataset_name == "sonnet":
         dataset = SonnetDataset(dataset_path=args.dataset_path)
         # For the "sonnet" dataset, formatting depends on the backend.
         if args.backend == "openai-chat":
@@ -789,7 +842,7 @@ if __name__ == "__main__":
         "--dataset-name",
         type=str,
         default="sharegpt",
-        choices=["sharegpt", "burstgpt", "sonnet", "random", "hf"],
+        choices=["sharegpt", "burstgpt", "sonnet", "random", "hf", "cleaned-random"],
         help="Name of the dataset to benchmark on.",
     )
     parser.add_argument("--dataset-path",
