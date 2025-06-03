@@ -1,7 +1,5 @@
-# testing
+# benchmarking
 pandas
-
-# testing utils
 httpx
 pqdm
 torch==2.6.0

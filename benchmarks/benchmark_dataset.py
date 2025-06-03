@@ -32,12 +32,15 @@ from datasets import load_dataset
 from PIL import Image
 from transformers import PreTrainedTokenizerBase
 
-from vllm.lora.request import LoRARequest
-from vllm.lora.utils import get_adapter_absolute_path
-from vllm.multimodal import MultiModalDataDict
-from vllm.transformers_utils.tokenizer import AnyTokenizer, get_lora_tokenizer
-
 logger = logging.getLogger(__name__)
+
+try:
+    from vllm.lora.request import LoRARequest
+    from vllm.lora.utils import get_adapter_absolute_path
+    from vllm.multimodal import MultiModalDataDict
+    from vllm.transformers_utils.tokenizer import AnyTokenizer, get_lora_tokenizer
+except ImportError:
+    logger.warning("vLLM dependencies not found. LoRA and multimodal features will be disabled.")
 
 # -----------------------------------------------------------------------------
 # Data Classes
