@@ -1,4 +1,5 @@
-# benchmarking
+# benchmark requirements
+# generate benchmark.txt with: uv pip compile requirements/benchmark.in -o requirements/benchmark.txt
 pandas
 httpx
 pqdm
@@ -7,4 +8,4 @@ torchaudio==2.6.0
 torchvision==0.21.0
 transformers==4.51.1
 datasets
-
+numpy
