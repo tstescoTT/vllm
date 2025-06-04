@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import argparse
+import base64
+from io import BytesIO
+import io
 import json
 import math
 import os
@@ -9,8 +12,11 @@ import time
 import logging
 import requests
 import torch
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Mapping
 from transformers import AutoTokenizer
+from PIL import Image
+import numpy as np
+from benchmarks.benchmark_dataset import generate_random_images
 
 # Set up logging
 logging.basicConfig(
@@ -212,7 +218,10 @@ def generate_cleaned_random_prompts(
     output_len: int,
     model_name: str,
     client: SimplePromptClient,
-    seed: int = 42
+    seed: int = 42,
+    images_per_prompt: Optional[int] = None,
+    image_width: Optional[int] = None,
+    image_height: Optional[int] = None,
 ) -> List[tuple[str, int, int, None]]:
     """
     Generate cleaned random prompts using server-side tokenization.
@@ -241,8 +250,9 @@ def generate_cleaned_random_prompts(
         # The actual token count might be slightly different due to cleaning
         prompt_len = len(tokens)
         
+        multi_modal_data = generate_random_images(images_per_prompt, image_width, image_height) if images_per_prompt is not None else None
         # Create prompt tuple (prompt_text, prompt_len, expected_output_len, multi_modal_data)
-        prompts.append((prompt_text, prompt_len, output_len, None))
+        prompts.append((prompt_text, prompt_len, output_len, multi_modal_data))
     
     logger.info(f"Generated {len(prompts)} cleaned prompts")
     avg_prompt_len = sum(p[1] for p in prompts) / len(prompts)
