@@ -609,7 +609,6 @@ def main(args: argparse.Namespace):
             model_name=model_id,
             client=server_client,
             seed=args.seed,
-            seed=args.seed,
             images_per_prompt=args.random_images_per_prompt,
             image_width=args.random_image_width,
             image_height=args.random_image_height
