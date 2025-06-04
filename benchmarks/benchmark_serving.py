@@ -61,7 +61,7 @@ from benchmark_dataset import (AIMODataset, BurstGPTDataset,
                                ConversationDataset, HuggingFaceDataset,
                                InstructCoderDataset, RandomDataset,
                                SampleRequest, ShareGPTDataset, SonnetDataset,
-                               VisionArenaDataset)
+                               VisionArenaDataset, generate_random_images)
 from benchmark_utils import convert_to_pytorch_benchmark_format, write_to_json
 
 # Server-side tokenization imports (optional)
@@ -104,6 +104,9 @@ def generate_cleaned_random_requests(
     model_name: str,
     client: PromptClient,
     seed: int = 42,
+    images_per_prompt: Optional[int] = None,
+    image_width: Optional[int] = None,
+    image_height: Optional[int] = None,
 ) -> list[SampleRequest]:
     """
     Generate cleaned random prompts using CleanedPromptGenerator with server-side tokenization.
@@ -139,13 +142,14 @@ def generate_cleaned_random_requests(
         
         # The actual token count might be slightly different due to cleaning
         prompt_len = len(tokens)
+        mm_content = generate_random_images(images_per_prompt, image_width, image_height) if images_per_prompt is not None else None
         
         # Create SampleRequest object
         request = SampleRequest(
             prompt=prompt_text,
             prompt_len=prompt_len,
             expected_output_len=output_len,
-            multi_modal_data=None
+            multi_modal_data=mm_content
         )
         input_requests.append(request)
     
@@ -382,7 +386,7 @@ async def benchmark(
         # multi-modal benchmark is only available on OpenAI Chat backend.
         raise ValueError(
             "Multi-modal content is only supported on 'openai-chat' backend.")
-    assert test_mm_content is None or isinstance(test_mm_content, dict)
+    assert test_mm_content is None or isinstance(test_mm_content, dict) or isinstance(test_mm_content, list[dict])
 
     # COMMENTED OUT: Initial single prompt test run - redundant with capture_traces
     # print("Starting initial single prompt test run...")
@@ -712,6 +716,9 @@ def main(args: argparse.Namespace):
             model_name=model_id,
             client=server_client,
             seed=args.seed,
+            images_per_prompt=args.random_images_per_prompt,
+            image_width=args.random_image_width,
+            image_height=args.random_image_height,
         )
 
     elif args.dataset_name == "sonnet":
@@ -793,6 +800,9 @@ def main(args: argparse.Namespace):
                 input_len=args.random_input_len,
                 output_len=args.random_output_len,
                 range_ratio=args.random_range_ratio,
+                images_per_prompt=args.random_images_per_prompt,
+                image_width=args.random_image_width,
+                image_height=args.random_image_height,
             )
         }
 
@@ -1158,6 +1168,24 @@ if __name__ == "__main__":
               "a random "
               "context length sampled from [input_len * (1 - range_ratio), "
               "input_len * (1 + range_ratio)]."),
+    )
+    random_group.add_argument(
+        "--random-images-per-prompt",
+        type=int,
+        default=None,
+        help="Number of random images per prompt. If not specified, no images will be generated."
+    )
+    random_group.add_argument(
+        "--random-image-width",
+        type=int,
+        default=None,
+        help="Width of the random images."
+    )
+    random_group.add_argument(
+        "--random-image-height",
+        type=int,
+        default=None,
+        help="Height of the random images."
     )
 
     hf_group = parser.add_argument_group("hf dataset options")
