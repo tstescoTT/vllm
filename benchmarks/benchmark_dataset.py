@@ -312,7 +312,7 @@ def generate_random_images(
         data = np.random.randint(0, 255, (height, width, 3), dtype=np.uint8)
 
         # Create PIL Image
-        image = IMG.fromarray(data, "RGB")
+        image = Image.fromarray(data, "RGB")
 
         image_dict = process_image(image)
         
