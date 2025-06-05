@@ -168,8 +168,9 @@ def generate_stable_prompt_tokens(
         torch.manual_seed(seed)
         random.seed(seed)
     else:
-        torch.manual_seed(random.randint(0, 128000))
-    
+        # Default seed for reproducibility
+        torch.manual_seed(9999)
+
     # Load tokenizer if using client-side tokenization
     if not server_tokenizer:
         tokenizer, actual_model = get_fallback_tokenizer(model_name, fallback_model)
@@ -231,6 +232,11 @@ def generate_cleaned_random_prompts(
     logger.info(f"Generating {num_prompts} cleaned random prompts...")
     
     prompts = []
+    desired_input_len = input_len
+
+    # Tokenization post tt-metal model impl in prefill has an extra token
+    OFFSET = 1
+    input_len -= OFFSET
     
     # Generate prompts with a progress bar
     for i in range(num_prompts):
@@ -256,7 +262,8 @@ def generate_cleaned_random_prompts(
     
     logger.info(f"Generated {len(prompts)} cleaned prompts")
     avg_prompt_len = sum(p[1] for p in prompts) / len(prompts)
-    logger.info(f"Average prompt length: {avg_prompt_len:.1f} tokens")
+    logger.info(f"Average actual prompt length: {avg_prompt_len:.1f} tokens")
+    logger.info(f"Post tokenization expected prompt length: {desired_input_len} tokens")
     
     return prompts
 
