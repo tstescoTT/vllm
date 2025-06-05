@@ -327,7 +327,7 @@ async def async_request_openai_completions(
                     output.generated_text = generated_text
                     output.latency = most_recent_timestamp - st
                 else:
-                    output.error = response.reason or ""
+                    output.error = await response.text() or ""
                     output.success = False
         except Exception:
             output.success = False
@@ -365,7 +365,7 @@ async def async_request_openai_chat_completions(
                 },
             ],
             "temperature": 0.0,
-            "max_completion_tokens": request_func_input.output_len,
+            "max_tokens": request_func_input.output_len,
             "stream": True,
             "stream_options": {
                 "include_usage": True,
@@ -426,7 +426,7 @@ async def async_request_openai_chat_completions(
                     output.success = True
                     output.latency = most_recent_timestamp - st
                 else:
-                    output.error = response.reason or ""
+                    output.error = await response.text() or ""
                     output.success = False
         except Exception:
             output.success = False
