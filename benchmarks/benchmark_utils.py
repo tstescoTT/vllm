@@ -16,7 +16,7 @@ from typing import Any, List, Optional, Mapping
 from transformers import AutoTokenizer
 from PIL import Image
 import numpy as np
-from benchmarks.benchmark_dataset import generate_random_images
+from benchmark_dataset import generate_random_images
 
 # Set up logging
 logging.basicConfig(
