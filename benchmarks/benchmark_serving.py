@@ -293,7 +293,7 @@ async def benchmark(
         # multi-modal benchmark is only available on OpenAI Chat backend.
         raise ValueError(
             "Multi-modal content is only supported on 'openai-chat' backend.")
-    assert test_mm_content is None or isinstance(test_mm_content, dict) or isinstance(test_mm_content, list[dict])
+    assert test_mm_content is None or isinstance(test_mm_content, dict) or isinstance(test_mm_content, list)
     test_input = RequestFuncInput(
         model=model_id,
         model_name=model_name,
