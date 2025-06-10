@@ -24,7 +24,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import cache
 from io import BytesIO
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -56,7 +56,7 @@ class SampleRequest:
     prompt: Union[str, Any]
     prompt_len: int
     expected_output_len: int
-    multi_modal_data: Optional[Union[Any, dict]] = None
+    multi_modal_data: Optional[Union[Any, dict, list[dict]]] = None
     lora_request: Optional[Any] = None
 
 
@@ -98,8 +98,10 @@ class BenchmarkDataset(ABC):
         format.
         """
         content = [{"text": prompt, "type": "text"}]
-        if mm_content is not None:
+        if mm_content is not None and isinstance(mm_content, dict):
             content.append(mm_content)
+        elif mm_content is not None and isinstance(mm_content, list):
+            content.extend(mm_content)
         return [{"role": "user", "content": content}]
 
     def load_data(self) -> None:
@@ -282,6 +284,41 @@ def process_image(image: Any) -> Mapping[str, Any]:
     raise ValueError(f"Invalid image input {image}. Must be a PIL.Image.Image"
                      " or str or dictionary with raw image bytes.")
 
+def generate_random_images(
+    n_images: int,
+    width: int,
+    height: int,
+) -> List[str]:
+    """
+    Generate multiple random RGB images and return them as base64 strings.
+
+    Args:
+        n_images (int): Number of images to generate
+        width (int): Width of each image
+        height (int): Height of each image
+        base64_encoded (bool): Whether to return base64 encoded images
+        img_format (str): Image format to save as
+
+    Returns:
+        list[str]: List of base64 encoded image data or raw bytes
+    """
+    assert width > 0
+    assert height > 0
+    assert n_images > 0
+    
+    img_data_list = []
+    for _ in range(n_images):
+        # Generate random RGB data
+        data = np.random.randint(0, 255, (height, width, 3), dtype=np.uint8)
+
+        # Create PIL Image
+        image = Image.fromarray(data, "RGB")
+
+        image_dict = process_image(image)
+        
+        img_data_list.append(image_dict)
+
+    return img_data_list
 
 # -----------------------------------------------------------------------------
 # Random Dataset Implementation (Synthetic Data)
@@ -309,7 +346,9 @@ class RandomDataset(BenchmarkDataset):
         range_ratio: float = DEFAULT_RANGE_RATIO,
         input_len: int = DEFAULT_INPUT_LEN,
         output_len: int = DEFAULT_OUTPUT_LEN,
-        **kwargs,
+        images_per_prompt: Optional[int] = None,
+        image_width: Optional[int] = None,
+        image_height: Optional[int] = None,
     ) -> list[SampleRequest]:
         # Enforce range_ratio < 1
         assert range_ratio < 1.0, (
@@ -347,11 +386,13 @@ class RandomDataset(BenchmarkDataset):
             token_sequence = prefix_token_ids + inner_seq
             prompt = tokenizer.decode(token_sequence)
             total_input_len = prefix_len + int(input_lens[i])
+            mm_content = generate_random_images(images_per_prompt, image_width, image_height) if images_per_prompt is not None else None
             requests.append(
                 SampleRequest(
                     prompt=prompt,
                     prompt_len=total_input_len,
                     expected_output_len=int(output_lens[i]),
+                    multi_modal_data=mm_content,
                 ))
         return requests
 

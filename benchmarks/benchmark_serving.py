@@ -68,7 +68,7 @@ from benchmark_dataset import (AIMODataset, BurstGPTDataset,
                                ConversationDataset, HuggingFaceDataset,
                                InstructCoderDataset, RandomDataset,
                                SampleRequest, ShareGPTDataset, SonnetDataset,
-                               VisionArenaDataset)
+                               VisionArenaDataset, generate_random_images)
 from benchmark_utils import (convert_to_pytorch_benchmark_format, write_to_json,
                              SimplePromptClient, generate_cleaned_random_prompts)
 
@@ -293,7 +293,7 @@ async def benchmark(
         # multi-modal benchmark is only available on OpenAI Chat backend.
         raise ValueError(
             "Multi-modal content is only supported on 'openai-chat' backend.")
-    assert test_mm_content is None or isinstance(test_mm_content, dict)
+    assert test_mm_content is None or isinstance(test_mm_content, dict) or isinstance(test_mm_content, list)
     test_input = RequestFuncInput(
         model=model_id,
         model_name=model_name,
@@ -608,7 +608,10 @@ def main(args: argparse.Namespace):
             output_len=args.random_output_len,
             model_name=model_id,
             client=server_client,
-            seed=args.seed
+            seed=args.seed,
+            images_per_prompt=args.random_images_per_prompt,
+            image_width=args.random_image_width,
+            image_height=args.random_image_height
         )
 
         # Convert to SampleRequest objects
@@ -621,6 +624,7 @@ def main(args: argparse.Namespace):
                 multi_modal_data=multi_modal_data
             )
             input_requests.append(request)
+            
 
     elif args.dataset_name == "sonnet":
         dataset = SonnetDataset(dataset_path=args.dataset_path)
@@ -701,6 +705,9 @@ def main(args: argparse.Namespace):
                 input_len=args.random_input_len,
                 output_len=args.random_output_len,
                 range_ratio=args.random_range_ratio,
+                images_per_prompt=args.random_images_per_prompt,
+                image_width=args.random_image_width,
+                image_height=args.random_image_height,
             )
         }
 
@@ -1065,6 +1072,24 @@ if __name__ == "__main__":
               "a random "
               "context length sampled from [input_len * (1 - range_ratio), "
               "input_len * (1 + range_ratio)]."),
+    )
+    random_group.add_argument(
+        "--random-images-per-prompt",
+        type=int,
+        default=None,
+        help="Number of random images per prompt. If not specified, no images will be generated."
+    )
+    random_group.add_argument(
+        "--random-image-width",
+        type=int,
+        default=None,
+        help="Width of the random images."
+    )
+    random_group.add_argument(
+        "--random-image-height",
+        type=int,
+        default=None,
+        help="Height of the random images."
     )
 
     hf_group = parser.add_argument_group("hf dataset options")

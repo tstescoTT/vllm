@@ -327,7 +327,7 @@ async def async_request_openai_completions(
                     output.generated_text = generated_text
                     output.latency = most_recent_timestamp - st
                 else:
-                    output.error = response.reason or ""
+                    output.error = await response.text() or ""
                     output.success = False
         except Exception:
             output.success = False
@@ -351,8 +351,10 @@ async def async_request_openai_chat_completions(
     async with aiohttp.ClientSession(trust_env=True,
                                      timeout=AIOHTTP_TIMEOUT) as session:
         content = [{"type": "text", "text": request_func_input.prompt}]
-        if request_func_input.multi_modal_content:
+        if request_func_input.multi_modal_content and isinstance(request_func_input.multi_modal_content, dict):
             content.append(request_func_input.multi_modal_content)
+        elif request_func_input.multi_modal_content and isinstance(request_func_input.multi_modal_content, list):
+            content.extend(request_func_input.multi_modal_content)
         payload = {
             "model": request_func_input.model_name \
                 if request_func_input.model_name else request_func_input.model,
@@ -363,7 +365,7 @@ async def async_request_openai_chat_completions(
                 },
             ],
             "temperature": 0.0,
-            "max_completion_tokens": request_func_input.output_len,
+            "max_tokens": request_func_input.output_len,
             "stream": True,
             "stream_options": {
                 "include_usage": True,
@@ -424,7 +426,7 @@ async def async_request_openai_chat_completions(
                     output.success = True
                     output.latency = most_recent_timestamp - st
                 else:
-                    output.error = response.reason or ""
+                    output.error = await response.text() or ""
                     output.success = False
         except Exception:
             output.success = False
