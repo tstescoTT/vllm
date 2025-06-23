@@ -22,10 +22,10 @@ On the client side, run:
 
 New dataset option "cleaned-random":
     Uses server-side tokenization to generate stable, cleaned random prompts.
-    Requires OPENAI_API_KEY environment variable and a running vLLM server.
+    Requires a running vLLM server. OPENAI_API_KEY environment variable is 
+    optional and only needed if the server requires authentication.
 
     Example:
-    export OPENAI_API_KEY="test-key"
     python benchmarks/benchmark_serving.py \
         --backend vllm \
         --model meta-llama/Llama-3.1-8B-Instruct \
@@ -587,8 +587,6 @@ def main(args: argparse.Namespace):
     if args.dataset_name == "cleaned-random":
         # Set up server client for server-side tokenization
         auth_token = os.environ.get("OPENAI_API_KEY")
-        if not auth_token:
-            raise ValueError("OPENAI_API_KEY environment variable must be set for cleaned-random dataset")
 
         server_client = SimplePromptClient(
             host=args.host,
