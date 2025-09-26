@@ -277,6 +277,8 @@ async def benchmark(
     max_concurrency: Optional[int],
     lora_modules: Optional[Iterable[str]],
     extra_body: Optional[dict],
+    structured_output_enabled: bool = False,
+    structured_output_extra_body: Optional[dict] = None,
 ):
     if backend in ASYNC_REQUEST_FUNCS:
         request_func = ASYNC_REQUEST_FUNCS[backend]
@@ -294,6 +296,12 @@ async def benchmark(
         raise ValueError(
             "Multi-modal content is only supported on 'openai-chat' backend.")
     assert test_mm_content is None or isinstance(test_mm_content, dict) or isinstance(test_mm_content, list)
+    
+    # Merge structured output parameters with existing extra_body for test request
+    test_extra_body = extra_body.copy() if extra_body else {}
+    if structured_output_enabled and structured_output_extra_body:
+        test_extra_body.update(structured_output_extra_body)
+    
     test_input = RequestFuncInput(
         model=model_id,
         model_name=model_name,
@@ -304,7 +312,7 @@ async def benchmark(
         logprobs=logprobs,
         multi_modal_content=test_mm_content,
         ignore_eos=ignore_eos,
-        extra_body=extra_body,
+        extra_body=test_extra_body,
     )
 
     test_output = await request_func(request_func_input=test_input)
@@ -374,6 +382,11 @@ async def benchmark(
             req_lora_module = next(lora_modules)
             req_model_id, req_model_name = req_lora_module, req_lora_module
 
+        # Merge structured output parameters with existing extra_body
+        final_extra_body = extra_body.copy() if extra_body else {}
+        if structured_output_enabled and structured_output_extra_body:
+            final_extra_body.update(structured_output_extra_body)
+        
         request_func_input = RequestFuncInput(model=req_model_id,
                                               model_name=req_model_name,
                                               prompt=prompt,
@@ -383,7 +396,7 @@ async def benchmark(
                                               logprobs=logprobs,
                                               multi_modal_content=mm_content,
                                               ignore_eos=ignore_eos,
-                                              extra_body=extra_body)
+                                              extra_body=final_extra_body)
         tasks.append(
             asyncio.create_task(
                 limited_request_func(request_func_input=request_func_input,
@@ -532,6 +545,68 @@ def parse_goodput(slo_pairs):
     return goodput_config_dict
 
 
+def get_default_structured_output_schema():
+    """Returns a default JSON schema for structured outputs."""
+    return {
+        "type": "object",
+        "properties": {
+            "name": {
+                "type": "string",
+                "description": "The name of the person"
+            },
+            "age": {
+                "type": "integer",
+                "description": "The age of the person",
+                "minimum": 0,
+                "maximum": 150
+            },
+            "email": {
+                "type": "string",
+                "description": "The email address of the person",
+                "format": "email"
+            },
+            "occupation": {
+                "type": "string",
+                "description": "The person's occupation"
+            },
+            "interests": {
+                "type": "array",
+                "items": {
+                    "type": "string"
+                },
+                "description": "A list of the person's interests"
+            }
+        },
+        "required": ["name", "age", "email"],
+        "additionalProperties": False
+    }
+
+
+def load_structured_output_schema(schema_path: Optional[str]) -> dict:
+    """Load JSON schema from file or return default schema."""
+    if schema_path:
+        try:
+            with open(schema_path, 'r') as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"Warning: Could not load schema from {schema_path}: {e}")
+            print("Using default schema instead.")
+    
+    return get_default_structured_output_schema()
+
+
+def prepare_structured_output_extra_body(schema: dict, backend: str) -> dict:
+    """Prepare extra_body parameters for structured output requests."""
+    extra_body = {
+        "guided_json": schema,
+        "guided_decoding_backend": backend
+    }
+    print(f"Structured output extra_body prepared:")
+    print(f"  - guided_json: {json.dumps(schema, indent=2)[:200]}...")
+    print(f"  - guided_decoding_backend: {backend}")
+    return extra_body
+
+
 def save_to_pytorch_benchmark_format(args: argparse.Namespace,
                                      results: dict[str, Any],
                                      file_name: str) -> None:
@@ -600,6 +675,8 @@ def main(args: argparse.Namespace):
             raise RuntimeError("Server is not healthy - cannot use cleaned-random dataset")
 
         # Generate cleaned random prompts using server-side tokenization
+        # Use the same random prompts regardless of structured output setting
+        # The structured output constraint will be applied at the decoding level
         prompt_tuples = generate_cleaned_random_prompts(
             num_prompts=args.num_prompts,
             input_len=args.random_input_len,
@@ -735,6 +812,28 @@ def main(args: argparse.Namespace):
     if "temperature" not in sampling_params:
         sampling_params["temperature"] = 0.0  # Default to greedy decoding.
 
+    # Handle structured output configuration
+    structured_output_enabled = args.structured_output
+    structured_output_extra_body = None
+    
+    if structured_output_enabled:
+        print("=" * 50)
+        print("STRUCTURED OUTPUT ENABLED")
+        print("=" * 50)
+        print("Loading JSON schema...")
+        schema = load_structured_output_schema(args.structured_output_schema)
+        structured_output_extra_body = prepare_structured_output_extra_body(
+            schema, args.structured_output_backend
+        )
+        print(f"Backend: {args.structured_output_backend}")
+        if args.structured_output_schema:
+            print(f"Custom schema: {args.structured_output_schema}")
+        else:
+            print("Using default JSON schema")
+        print("All requests will be constrained to follow the JSON schema")
+        print("regardless of input prompt content.")
+        print("=" * 50)
+
     # Avoid GC processing "static" data - reduce pause times.
     gc.collect()
     gc.freeze()
@@ -762,6 +861,8 @@ def main(args: argparse.Namespace):
             max_concurrency=args.max_concurrency,
             lora_modules=args.lora_modules,
             extra_body=sampling_params,
+            structured_output_enabled=structured_output_enabled,
+            structured_output_extra_body=structured_output_extra_body,
         ))
 
     # Save config and results to json
@@ -1158,6 +1259,24 @@ if __name__ == "__main__":
                         help="A subset of LoRA module names passed in when "
                         "launching the server. For each request, the "
                         "script chooses a LoRA module at random.")
+
+    # Structured output arguments
+    structured_output_group = parser.add_argument_group("structured output options")
+    structured_output_group.add_argument(
+        "--structured-output",
+        action="store_true",
+        help="Enable structured output for all requests (equivalent to --structured-output-ratio 1.0)")
+    structured_output_group.add_argument(
+        "--structured-output-backend",
+        type=str,
+        choices=["outlines", "lm-format-enforcer", "xgrammar", "guidance", "auto"],
+        default="auto",
+        help="Backend to use for structured outputs")
+    structured_output_group.add_argument(
+        "--structured-output-schema",
+        type=str,
+        default=None,
+        help="Path to JSON schema file for structured outputs. If not provided, uses a default schema.")
 
     args = parser.parse_args()
 
