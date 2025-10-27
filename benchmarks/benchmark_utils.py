@@ -33,7 +33,9 @@ class SimplePromptClient:
     def __init__(self, host: str = "127.0.0.1", port: int = 8000, auth_token: str = None):
         self.host = host
         self.port = port
-        self.base_url = f"http://{host}:{port}"
+        # self.base_url = f"http://{host}:{port}"
+        self.base_url = "http://localhost:8000"
+        auth_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0ZWFtX2lkIjoidGVuc3RvcnJlbnQiLCJ0b2tlbl9pZCI6ImRlYnVnLXRlc3QifQ.kkqzJ-xEhQFWh4TD6cJFmNd_gkkxn9jwdDg3V0BkEK8"
         self.headers = {}
         if auth_token:
             self.headers["Authorization"] = f"Bearer {auth_token}"
