@@ -739,6 +739,8 @@ def main(args: argparse.Namespace):
     gc.collect()
     gc.freeze()
 
+    print("GOT HERE")
+    breakpoint()
     benchmark_result = asyncio.run(
         benchmark(
             backend=backend,
