@@ -271,6 +271,7 @@ async def async_request_openai_completions(
         if request_func_input.extra_body:
             payload.update(request_func_input.extra_body)
         headers = {"Authorization": f"Bearer {os.environ.get('OPENAI_API_KEY')}"}
+        breakpoint()
 
         output = RequestFuncOutput()
         output.prompt_len = request_func_input.prompt_len
