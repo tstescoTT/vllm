@@ -150,7 +150,7 @@ async def async_request_trt_llm(
         st = time.perf_counter()
         most_recent_timestamp = st
         try:
-            async with session.post(url=api_url, json=payload) as response:
+            async with session.post(url=api_url, json=payload, ssl=False) as response:
                 if response.status == 200:
                     async for chunk_bytes in response.content:
                         chunk_bytes = chunk_bytes.strip()
